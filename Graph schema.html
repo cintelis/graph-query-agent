@@ -55,10 +55,13 @@
   .mapcard{ border:1.5px solid var(--ink-line); border-radius: var(--r-md); background: var(--card); overflow:hidden; }
   .mapcard .mc-head{ display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1.5px solid var(--ink-line); background: var(--paper-warm); }
   .map-scroll{ overflow:auto; padding:14px; }
-  .map-inner{ position:relative; width:820px; height:560px; }
-  .map-inner svg{ position:absolute; inset:0; width:820px; height:560px; pointer-events:none; }
-  .nbox{ position:absolute; width:118px; box-sizing:border-box; border:1.5px solid var(--ink); border-radius: var(--r-sm); background: var(--card); padding:7px 9px; cursor:pointer; z-index:2; transition: background var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+  .map-inner{ position:relative; }
+  .map-inner svg{ position:absolute; inset:0; pointer-events:none; }
+  .nbox{ position:absolute; width:118px; box-sizing:border-box; border:1.5px solid var(--ink); border-radius: var(--r-sm); background: var(--card); padding:7px 9px; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; z-index:2; transition: background var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
   .nbox:hover{ background: var(--paper-warm); }
+  .nbox.dragging{ cursor:grabbing; z-index:5; box-shadow:0 8px 18px rgba(12,18,28,.22); transition:none; }
+  .mc-reset{ display:inline-flex; align-items:center; gap:6px; font-family: var(--font-mono); font-size:10.5px; color: var(--ink-soft); border:1.5px solid var(--ink-line); background: var(--card); border-radius:999px; padding:3px 10px; cursor:pointer; transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+  .mc-reset:hover{ border-color: var(--ink); color: var(--ink); }
   .nbox .bn{ font-family: var(--font-mono); font-size:12px; font-weight:500; line-height:1.2; }
   .nbox .br{ font-size:9px; color: var(--ink-faint); margin-top:2px; }
   .nbox.sel{ border:2px solid var(--ink); padding:6px 8px; box-shadow:0 0 0 3px rgba(27,30,44,.12); }
@@ -175,11 +178,12 @@
               <i class="ph ph-share-network" style="font-size:16px;"></i>
               <span class="oc-h">Relationship map</span>
               <span class="oc-spacer"></span>
-              <span class="oc-sub" style="font-size:11px;">click a label or edge · scroll to pan</span>
+              <span class="oc-sub" style="font-size:11px;">drag to rearrange · click a label or edge</span>
+              <button class="mc-reset" onclick="resetLayout()" title="Restore the default arrangement"><i class="ph ph-arrows-counter-clockwise"></i> Reset layout</button>
             </div>
             <div class="map-scroll">
               <div class="map-inner" id="mapInner">
-                <svg id="mapSvg" viewBox="0 0 820 560">
+                <svg id="mapSvg">
                   <defs>
                     <marker id="ah" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto" markerUnits="userSpaceOnUse">
                       <path d="M0,0 L7.5,3 L0,6 Z" fill="#454858"></path>
@@ -264,12 +268,39 @@
     { id:'EMITS',        from:'Sensor',         to:'Reading',         card:'1 → many',    edge:[], desc:'A sensor emits time-series readings.' }
   ];
 
-  const POS = {
-    Site:[16,28], Sensor:[16,196], Technician:[16,316], MaintenancePlan:[16,478],
-    Asset:[230,60], WorkOrder:[230,372], Component:[312,212],
-    Location:[472,18], AssetClass:[472,104], FailureMode:[472,224], Reading:[472,372],
-    MaintenanceTask:[662,300]
+  /* Default layout as FRACTIONS of the free canvas area (0..1), so the map
+     auto-scales to whatever width the card has. Dragging a node updates its
+     fraction, so manual arrangements survive window resizes proportionally. */
+  const DEFAULT_FRAC = {
+    Site:[.02,.03], Sensor:[.02,.33], Technician:[.02,.62], MaintenancePlan:[.02,.92],
+    Asset:[.32,.09], Component:[.45,.42], WorkOrder:[.32,.72],
+    Location:[.66,.02], AssetClass:[.68,.23], FailureMode:[.68,.47], Reading:[.66,.74],
+    MaintenanceTask:[.97,.56]
   };
+  let FRAC = JSON.parse(JSON.stringify(DEFAULT_FRAC));
+  let W = 820, H = 560;
+
+  /* size the canvas to the card and place every box from its fraction */
+  function layout(){
+    const scroll = document.querySelector('.map-scroll');
+    const inner = document.getElementById('mapInner');
+    W = Math.max(700, scroll.clientWidth - 28);
+    H = Math.max(560, Math.min(760, Math.round(W * 0.62)));
+    inner.style.width = W + 'px'; inner.style.height = H + 'px';
+    const svg = document.getElementById('mapSvg');
+    svg.setAttribute('width', W); svg.setAttribute('height', H);
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    document.querySelectorAll('.nbox[data-node]').forEach(b=>{
+      const [fx,fy] = FRAC[b.dataset.node];
+      b.style.left = Math.round(fx * (W - b.offsetWidth)) + 'px';
+      b.style.top  = Math.round(fy * (H - b.offsetHeight)) + 'px';
+    });
+  }
+
+  function resetLayout(){
+    FRAC = JSON.parse(JSON.stringify(DEFAULT_FRAC));
+    layout(); drawEdges();
+  }
 
   const GROUPS = ['Place','Asset model','Failure & maintenance','Work & people','Condition monitoring'];
 
@@ -296,16 +327,46 @@
   /* node boxes + svg edges */
   function renderMap(){
     const inner = document.getElementById('mapInner');
-    // boxes
-    Object.keys(POS).forEach(k=>{
-      const [x,y]=POS[k];
+    // boxes (positioned by layout() from their fractions)
+    Object.keys(DEFAULT_FRAC).forEach(k=>{
       const b=document.createElement('div');
-      b.className='nbox'; b.dataset.node=k; b.style.left=x+'px'; b.style.top=y+'px';
+      b.className='nbox'; b.dataset.node=k;
       b.innerHTML=`<div class="bn">${k}</div><div class="br">${NODES[k].role}</div>`;
-      b.onclick=()=>selectNode(k);
+      b.onclick=()=>{ if(justDragged) return; selectNode(k); };
       inner.appendChild(b);
     });
+    layout();
     drawEdges();
+    initDrag(inner);
+  }
+
+  /* ---------- drag: move any box; a 3px threshold separates drag from click ---------- */
+  let drag=null, justDragged=false;
+  function initDrag(inner){
+    inner.addEventListener('pointerdown', e=>{
+      const b=e.target.closest('.nbox'); if(!b || !b.dataset.node) return;
+      drag={ b, k:b.dataset.node, sx:e.clientX, sy:e.clientY, ox:b.offsetLeft, oy:b.offsetTop, moved:false };
+      try{ b.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    inner.addEventListener('pointermove', e=>{
+      if(!drag) return;
+      const dx=e.clientX-drag.sx, dy=e.clientY-drag.sy;
+      if(!drag.moved && Math.hypot(dx,dy)>3){ drag.moved=true; drag.b.classList.add('dragging'); }
+      if(!drag.moved) return;
+      const x=Math.max(0, Math.min(W-drag.b.offsetWidth,  drag.ox+dx));
+      const y=Math.max(0, Math.min(H-drag.b.offsetHeight, drag.oy+dy));
+      drag.b.style.left=x+'px'; drag.b.style.top=y+'px';
+      FRAC[drag.k]=[ x/(W-drag.b.offsetWidth), y/(H-drag.b.offsetHeight) ];
+      drawEdges();
+    });
+    const end=()=>{
+      if(!drag) return;
+      drag.b.classList.remove('dragging');
+      justDragged=drag.moved; drag=null;
+      if(justDragged) setTimeout(()=>{ justDragged=false; },0);
+    };
+    inner.addEventListener('pointerup', end);
+    inner.addEventListener('pointercancel', end);
   }
 
   function center(label){
@@ -341,6 +402,28 @@
       lab.onclick=(e)=>{ e.stopPropagation(); selectRel(r.id); };
       inner.appendChild(lab);
     });
+    reapplySel();
+  }
+
+  /* edges + labels are recreated on every redraw (drag/resize) — re-mark them
+     from the current selection so highlights survive */
+  let curSel=null; // {t:'node'|'rel'|'ov', id}
+  function reapplySel(){
+    if(!curSel) return;
+    if(curSel.t==='node'){
+      RELS.forEach(r=>{
+        if(r.from===curSel.id||r.to===curSel.id){
+          const ln=document.querySelector(`.edge-line[data-rel="${r.id}"]`);
+          if(ln){ ln.classList.add('adj'); ln.setAttribute('marker-end','url(#ah-a)'); }
+        }
+      });
+    }else if(curSel.t==='rel'){
+      document.querySelector(`.elabel[data-rel="${curSel.id}"]`)?.classList.add('sel');
+      const ln=document.querySelector(`.edge-line[data-rel="${curSel.id}"]`);
+      if(ln){ ln.classList.add('sel'); ln.setAttribute('marker-end','url(#ah-a)'); }
+    }else{
+      document.querySelectorAll('.edge-line').forEach(l=>{ l.classList.add('adj'); l.setAttribute('marker-end','url(#ah-a)'); });
+    }
   }
 
   /* ============================ SELECTION ============================ */
@@ -358,6 +441,7 @@
 
   function selectNode(label){
     clearSel();
+    curSel={t:'node', id:label};
     setKind('ph-cube','Node label');
     document.querySelector(`.lbl-item[data-node="${label}"]`)?.classList.add('sel');
     document.querySelector(`.nbox[data-node="${label}"]`)?.classList.add('sel');
@@ -375,6 +459,7 @@
 
   function selectRel(id){
     clearSel();
+    curSel={t:'rel', id};
     setKind('ph-arrow-bend-up-right','Relationship');
     const r=RELS.find(x=>x.id===id);
     document.querySelector(`.elabel[data-rel="${id}"]`)?.classList.add('sel');
@@ -387,6 +472,7 @@
 
   function selectOverview(){
     clearSel();
+    curSel={t:'ov'};
     setKind('ph-graph','Schema overview');
     document.querySelector('.lbl-item.ov')?.classList.add('sel');
     document.querySelectorAll('.edge-line').forEach(l=>{ l.classList.add('adj'); l.setAttribute('marker-end','url(#ah-a)'); });
@@ -551,8 +637,10 @@
   /* ============================ INIT ============================ */
   renderLabelList();
   renderMap();
-  // redraw edges once fonts/layout settle (box heights can shift)
-  window.addEventListener('load', ()=>{ drawEdges(); selectNode('Asset'); });
+  // auto-fit: re-layout whenever the card changes size (window resize, split drag)
+  new ResizeObserver(()=>{ layout(); drawEdges(); }).observe(document.querySelector('.map-scroll'));
+  // re-layout once fonts settle (box heights can shift)
+  window.addEventListener('load', ()=>{ layout(); drawEdges(); selectNode('Asset'); });
   selectNode('Asset');
 </script>
 <script src="assets/mobile-nav.js" defer></script>

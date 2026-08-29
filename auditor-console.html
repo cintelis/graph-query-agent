@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graph Query Agent — Auditor Console</title>
+<link rel="stylesheet" href="assets/console-system.css">
+<meta name="description" content="Governed, deterministic, read-only questions over a software DesignGraph — live against Neo4j, every answer with full lineage.">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<style>
+  html,body{ height:100%; }
+  body{ margin:0; }
+  .work-section{ display:flex; flex-direction:column; gap:10px; }
+
+  /* self-contained inline SVG icons (no icon-font CDN on this page) */
+  .ic{ width:17px; height:17px; flex:none; display:inline-block; vertical-align:-3px; }
+  .ic-lg{ width:22px; height:22px; }
+
+  /* scope row */
+  .scope-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .scope-row .fld{ flex:1; min-width:180px; display:flex; flex-direction:column; gap:5px; }
+  .scope-row label{ font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); }
+  .txt-in, .sel-in{ font-family:var(--font-mono); font-size:12.5px; color:var(--ink); background:#fff; border:1.5px solid var(--ink-line); border-radius:var(--r-sm); padding:9px 11px; outline:none; width:100%; }
+  .txt-in:focus, .sel-in:focus{ border-color:var(--accent-cyan); box-shadow:0 0 0 3px var(--accent-cyan-soft); }
+
+  /* intent chips (deterministic catalogue) */
+  .chips{ display:flex; flex-direction:column; gap:8px; }
+  .ichip{ display:flex; align-items:center; gap:10px; text-align:left; padding:10px 12px; border:1.5px solid var(--ink-line); border-radius:var(--r-sm); background:var(--card); cursor:pointer; font-family:var(--font-body); transition:border-color var(--dur-fast) var(--ease); width:100%; }
+  .ichip:hover{ border-color:var(--accent-cyan); }
+  .ichip.sel{ border-color:var(--accent-cyan); box-shadow:0 0 0 3px var(--accent-cyan-soft); }
+  .ichip .nm{ font-family:var(--font-mono); font-size:12.5px; color:var(--ink); }
+  .ichip .ver{ font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); }
+  .ichip .desc{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+
+  /* param form */
+  .pform{ display:flex; flex-direction:column; gap:10px; }
+  .pform .prow{ display:flex; flex-direction:column; gap:5px; }
+  .pform .plbl{ font-family:var(--font-mono); font-size:11px; color:var(--ink); }
+  .pform .plbl .req{ color:var(--marker); }
+  .pform .phelp{ font-size:11px; color:var(--ink-faint); }
+
+  /* results table */
+  .rwrap{ overflow:auto; border:1px solid var(--ink-line); border-radius:var(--r-sm); }
+  .rtable{ width:100%; border-collapse:collapse; font-size:12px; background:#fff; }
+  .rtable th{ font-family:var(--font-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); text-align:left; padding:8px 12px; border-bottom:1.5px solid var(--ink-line); background:var(--paper); position:sticky; top:0; white-space:nowrap; }
+  .rtable td{ padding:7px 12px; border-bottom:1px solid var(--hair); font-family:var(--font-mono); font-size:11.5px; vertical-align:top; }
+  .rtable tr:last-child td{ border-bottom:none; }
+  .rtable td .null{ color:var(--ink-faint); }
+  .st{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:.05em; border-radius:6px; padding:1px 6px; border:1px solid; }
+  .st.VERIFIED{ color:var(--read-ink); border-color:#BFE6D2; background:var(--read-soft); }
+  .st.IMPLEMENTED{ color:#0C6FC2; border-color:#BFE1FB; background:var(--accent-cyan-soft); }
+  .st.PLANNED{ color:var(--write-ink); border-color:#F3D6A5; background:var(--write-soft); }
+  .st.UNKNOWN{ color:var(--ink-faint); border-color:var(--hair); background:var(--paper); }
+
+  .ev-sec{ margin-bottom:22px; }
+  .lin-card{ border:1.5px solid var(--ink-line); border-radius:var(--r-sm); padding:14px 16px; background:var(--paper); }
+</style>
+</head>
+<body>
+<div class="oc">
+  <div class="oc-app">
+
+    <!-- ===================== LEFT RAIL (mirrors Console - Ask.html) ===================== -->
+    <aside class="oc-rail">
+      <a class="oc-brand" href="index.html" title="Back to all screens"><span class="oc-brandmark"><svg class="ic ic-lg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="3.5" r="1.8"/><circle cx="5" cy="12" r="1.8"/><circle cx="12.5" cy="11.5" r="1.8"/><path d="M5.6 4.9 10.3 4M5 6v4.2M6.7 11.4l4-.5M11.9 5.3l.5 4.4"/></svg></span><div class="wm">Graph Query<small>agent</small></div></a>
+      <div class="oc-navgrp">Live</div>
+      <div class="oc-nav on"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg> Auditor console</div>
+      <div class="oc-navgrp">Workspace (mockups)</div>
+      <a class="oc-nav" href="Console - Ask.html" style="text-decoration:none;"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M4.5 6.5 7 8.5l-2.5 2M8.5 10.5h3"/></svg> Ask</a>
+      <a class="oc-nav" href="Results - Lineage.html" style="text-decoration:none;"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 6.5h13M6 6.5v7M11 6.5v7"/></svg> Results</a>
+      <a class="oc-nav" href="Trace - Audit.html" style="text-decoration:none;"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="3" r="1.8"/><circle cx="4" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><path d="M8 4.8v3M8 7.8 4.8 10.6M8 7.8l3.2 2.8"/></svg> Trace</a>
+      <a class="oc-nav" href="History.html" style="text-decoration:none;"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.8"/></svg> History</a>
+      <div class="oc-navgrp">Reference</div>
+      <a class="oc-nav" href="Intent catalogue.html" style="text-decoration:none;"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 4l1.2 1.2L5.5 3M2 9l1.2 1.2L5.5 8M8 4.5h6M8 9.5h6M8 13.5h6M2.5 13l1.2 1.2L6 12"/></svg> Intent catalogue</a>
+      <a class="oc-nav" href="Tool registry.html" style="text-decoration:none;"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5.5 1.5v4M10.5 1.5v4M3.5 5.5h9v3a4.5 4.5 0 0 1-9 0zM8 13v2"/></svg> Tool registry</a>
+      <a class="oc-nav" href="Graph schema.html" style="text-decoration:none;"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="3.5" r="1.8"/><circle cx="5" cy="12" r="1.8"/><circle cx="12.5" cy="11.5" r="1.8"/><path d="M5.6 4.9 10.3 4M5 6v4.2M6.7 11.4l4-.5"/></svg> Graph schema</a>
+      <a class="oc-nav" href="Graph explorer.html" style="text-decoration:none;"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12.5" cy="3.5" r="1.8"/><circle cx="3.5" cy="8" r="1.8"/><circle cx="12.5" cy="12.5" r="1.8"/><path d="M5.2 7.2l5.6-2.9M5.2 8.8l5.6 2.9"/></svg> Graph explorer</a>
+      <div class="oc-rail-foot">Strictly read-only against the platform DesignGraph. Only registered intents run — never free-form queries.</div>
+    </aside>
+
+    <!-- ===================== MAIN ===================== -->
+    <div class="oc-main">
+
+      <!-- top bar -->
+      <div class="oc-top">
+        <span class="crumb">Live / <b>Auditor console</b></span>
+        <span class="oc-pill dim" id="connPill"><span class="dot"></span>not connected</span>
+        <span class="oc-spacer"></span>
+        <span class="oc-meta">request_id <b id="metaReq">—</b></span>
+        <span class="oc-meta">graph_version <b id="metaVer">—</b></span>
+      </div>
+
+      <!-- master-detail split -->
+      <div class="oc-split">
+
+        <!-- ---------- WORK PANE (left) ---------- -->
+        <div class="oc-work">
+
+          <div class="work-section">
+            <span class="oc-eyebrow">Scope</span>
+            <div class="oc-card" style="padding:16px 18px;">
+              <div class="scope-row">
+                <div class="fld" style="flex:1.4;">
+                  <label for="baseUrl">backend url</label>
+                  <input class="txt-in" id="baseUrl" value="http://localhost:8000" spellcheck="false">
+                </div>
+                <div class="fld">
+                  <label for="projectSel">project graph</label>
+                  <select class="sel-in" id="projectSel"></select>
+                </div>
+                <div class="fld" style="flex:0; min-width:auto; justify-content:flex-end;">
+                  <label>&nbsp;</label>
+                  <span class="oc-btn sm" id="connectBtn" onclick="connect()">Connect</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- error card -->
+          <div id="errCard" class="oc-card" style="padding:14px 18px; display:none; align-items:flex-start; gap:12px;">
+            <span class="oc-pill err"><span class="dot"></span>error</span>
+            <span class="oc-sub" id="errMsg" style="font-family:var(--font-mono); font-size:11.5px; word-break:break-word;"></span>
+          </div>
+
+          <div class="work-section">
+            <span class="oc-eyebrow">Request</span>
+            <div class="oc-reqbox">
+              <input id="reqInput" class="q" placeholder="e.g. what requirements are implemented, and by which code?" aria-label="Request" onkeydown="if(event.key==='Enter')doAsk()">
+              <span class="oc-btn primary" id="askBtn" onclick="doAsk()">Ask</span>
+            </div>
+            <span class="oc-sub" style="font-size:11.5px;">Matching is deterministic keyword overlap against registered intents — no LLM, no guessing. Low confidence means the console asks you to pick from the catalogue instead.</span>
+          </div>
+
+          <!-- matched intent + param form -->
+          <div id="intentPanel" class="oc-card" style="padding:18px 20px; display:none; flex-direction:column; gap:16px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="oc-eyebrow" style="margin:0;" id="matchLabel">Matched intent</span>
+              <span class="oc-spacer"></span>
+              <span class="oc-pill read"><span class="dot"></span>read</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <span class="oc-intent-name" id="intentName">—</span>
+              <span class="oc-sub" id="intentDesc" style="font-size:12px;"></span>
+              <div class="oc-conf" id="confRow">
+                <span class="lbl">confidence</span>
+                <span class="track"><span class="fill" id="confFill" style="width:0%;"></span></span>
+                <span class="num" id="confNum">—</span>
+              </div>
+              <span class="oc-sub" id="confNote" style="font-size:12px;"></span>
+            </div>
+            <div id="candidates" style="display:none; flex-direction:column; gap:6px;"></div>
+            <div class="oc-divider"></div>
+            <div style="display:flex; flex-direction:column; gap:11px;">
+              <span class="oc-eyebrow" style="margin:0;">Parameters</span>
+              <div class="pform" id="paramForm"></div>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; padding-top:4px;">
+              <span class="oc-btn primary" id="runBtn" onclick="runIntent()">Run read-only query</span>
+              <span class="oc-sub" style="font-size:11.5px;">The exact Cypher appears in the evidence pane before and after it runs.</span>
+            </div>
+          </div>
+
+          <div class="work-section">
+            <span class="oc-eyebrow">Intent catalogue · the whole query surface</span>
+            <div class="chips" id="chips"><span class="oc-sub" style="font-size:11.5px;">Connect to load the registry…</span></div>
+          </div>
+
+        </div>
+
+        <!-- ---------- EVIDENCE PANE (right) ---------- -->
+        <div class="oc-evidence">
+          <div class="oc-ev-head">
+            <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 6.5h13M6 6.5v7M11 6.5v7"/></svg>
+            <span class="oc-ev-title">Evidence</span>
+            <span class="oc-spacer"></span>
+            <span class="oc-pill dim" id="evStatus"><span class="dot"></span>no query yet</span>
+          </div>
+          <div class="oc-ev-body" id="evBody">
+            <div class="oc-empty" id="evEmpty">
+              <span class="glyph"><svg class="ic ic-lg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span>
+              <span class="ttl">Ask a governed question</span>
+              <span style="font-size:12px; max-width:38ch;">Results, the exact Cypher that ran, and a full lineage card will appear here.</span>
+            </div>
+
+            <div id="evContent" style="display:none;">
+              <div class="ev-sec">
+                <div style="display:flex; align-items:center; gap:9px; margin-bottom:8px;">
+                  <span class="oc-detail-label" style="margin:0;">Results</span>
+                  <span class="oc-spacer"></span>
+                  <span class="oc-meta" id="rowCount"></span>
+                </div>
+                <div class="rwrap" id="resultsWrap"></div>
+              </div>
+
+              <div class="ev-sec">
+                <div style="display:flex; align-items:center; gap:9px; margin-bottom:8px;">
+                  <span class="oc-detail-label" style="margin:0;">Executed Cypher</span>
+                  <span class="oc-ro">read-only</span>
+                  <span class="oc-spacer"></span>
+                  <span class="oc-meta" id="cypherIntent"></span>
+                </div>
+                <div class="oc-code" id="cypherBlock"></div>
+                <div style="margin-top:8px;">
+                  <div class="oc-detail-label">bound parameters</div>
+                  <div class="oc-code" id="paramsBlock"></div>
+                </div>
+              </div>
+
+              <div class="ev-sec">
+                <div class="oc-detail-label" style="margin-bottom:8px;">Lineage — where this answer came from</div>
+                <div class="lin-card">
+                  <div class="oc-kv">
+                    <span class="k">request_id</span><span class="v" id="linReq">—</span>
+                    <span class="k">produced_by</span><span class="v" id="linBy">—</span>
+                    <span class="k">source</span><span class="v" id="linSrc">—</span>
+                    <span class="k">graph_version</span><span class="v" id="linVer">—</span>
+                    <span class="k">timing</span><span class="v" id="linMs">—</span>
+                    <span class="k">attempts</span><span class="v" id="linAtt">—</span>
+                    <span class="k">access</span><span class="v">read-only session · registered template</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ---------------- state ----------------
+let INTENTS = [];            // public registry from /api/intents
+let THRESHOLD = 0.5;
+let selected = null;         // currently selected intent (object from registry)
+let optionsCache = {};       // `${pid}|${kind}` -> [{id,name,kind}]
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function base(){ return $('baseUrl').value.trim().replace(/\/+$/, ''); }
+function project(){ return $('projectSel').value || null; }
+
+function setPill(id, cls, text){
+  const el = $(id);
+  el.className = 'oc-pill ' + cls;
+  el.innerHTML = '<span class="dot"></span>' + esc(text);
+}
+function showError(msg){
+  $('errCard').style.display = 'flex';
+  $('errMsg').textContent = msg;
+  setPill('connPill', 'err', 'backend / neo4j error');
+}
+function clearError(){ $('errCard').style.display = 'none'; }
+
+async function api(path, opts){
+  const res = await fetch(base() + path, opts);
+  let body = null;
+  try { body = await res.json(); } catch (e) { /* non-JSON error page */ }
+  if (!res.ok) {
+    const detail = body && body.detail ? body.detail : (res.status + ' ' + res.statusText);
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+  }
+  return body;
+}
+
+// ---------------- connect / registry ----------------
+async function connect(){
+  clearError();
+  setPill('connPill', 'dim', 'connecting…');
+  try {
+    const reg = await api('/api/intents');
+    INTENTS = reg.intents;
+    THRESHOLD = reg.confidence_threshold || 0.5;
+    renderChips();
+    const projects = await api('/api/projects');
+    renderProjects(projects.rows);
+    if (projects.lineage) stampTopMeta(projects.lineage);
+    setPill('connPill', 'read', 'connected · ' + projects.rows.length + ' project graph' + (projects.rows.length === 1 ? '' : 's'));
+    optionsCache = {};
+  } catch (err) {
+    showError(err.message + ' — is the backend running (uvicorn app.main:app --port 8000) and Neo4j reachable?');
+    $('chips').innerHTML = '<span class="oc-sub" style="font-size:11.5px;">Registry unavailable.</span>';
+  }
+}
+
+function renderProjects(rows){
+  const sel = $('projectSel');
+  sel.innerHTML = '';
+  rows.forEach(r => {
+    const o = document.createElement('option');
+    o.value = r.projectId;
+    o.textContent = `${r.projectId}  (${r.nodeCount}n / ${r.edgeCount}e)`;
+    sel.appendChild(o);
+  });
+  if (!rows.length) {
+    const o = document.createElement('option');
+    o.value = ''; o.textContent = 'no project graphs found';
+    sel.appendChild(o);
+  }
+}
+
+function renderChips(){
+  const box = $('chips');
+  box.innerHTML = '';
+  INTENTS.forEach(it => {
+    const b = document.createElement('button');
+    b.className = 'ichip';
+    b.id = 'chip-' + it.id;
+    b.innerHTML =
+      `<div style="flex:1; min-width:0;">
+         <div><span class="nm">${esc(it.id)}</span><span class="ver">@${it.version}</span></div>
+         <div class="desc">${esc(it.description)}</div>
+       </div>
+       <span class="oc-pill read" style="font-size:9px; padding:2px 7px;"><span class="dot"></span>read</span>`;
+    b.onclick = () => selectIntent(it, null);
+    box.appendChild(b);
+  });
+}
+
+// ---------------- ask (deterministic match) ----------------
+async function doAsk(){
+  const q = $('reqInput').value.trim();
+  if (!q) return;
+  clearError();
+  try {
+    const m = await api('/api/ask', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question: q, projectId: project()})
+    });
+    if (!m.matched_intent) {
+      $('intentPanel').style.display = 'none';
+      showError('No registered intent matches that question. This console does not guess — pick an intent from the catalogue below.');
+      return;
+    }
+    const it = INTENTS.find(i => i.intent === m.matched_intent.intent) || m.matched_intent;
+    selectIntent(it, m);
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+// ---------------- intent selection + param form ----------------
+async function selectIntent(it, match){
+  selected = it;
+  document.querySelectorAll('.ichip').forEach(c => c.classList.toggle('sel', c.id === 'chip-' + it.id));
+  $('intentPanel').style.display = 'flex';
+  $('intentName').textContent = it.intent;
+  $('intentDesc').textContent = it.description;
+
+  if (match) {
+    $('matchLabel').textContent = 'Matched intent';
+    $('confRow').style.display = 'flex';
+    const pct = Math.round(match.confidence * 100);
+    $('confFill').style.width = pct + '%';
+    $('confFill').className = 'fill' + (match.confidence < THRESHOLD ? ' low' : '');
+    $('confNum').textContent = match.confidence.toFixed(2);
+    $('confNote').textContent = match.confidence >= THRESHOLD
+      ? 'Deterministic keyword match above the threshold (' + THRESHOLD.toFixed(2) + '). Confirm parameters, then run.'
+      : 'Below the threshold (' + THRESHOLD.toFixed(2) + ') — verify this is the right capability, or pick one explicitly below.';
+    const cand = $('candidates');
+    if (match.candidates && match.candidates.length > 1) {
+      cand.style.display = 'flex';
+      cand.innerHTML = '<span class="oc-detail-label" style="margin:0;">candidates</span>' +
+        match.candidates.map(c =>
+          `<div style="display:flex; gap:10px; align-items:center; font-family:var(--font-mono); font-size:11.5px;">
+             <span>${esc(c.intent)}</span><span class="oc-spacer"></span>
+             <span style="color:var(--ink-faint);">${c.confidence.toFixed(2)}</span>
+           </div>`).join('');
+    } else cand.style.display = 'none';
+  } else {
+    $('matchLabel').textContent = 'Selected intent · explicit';
+    $('confRow').style.display = 'none';
+    $('confNote').textContent = 'Chosen directly from the catalogue — no matching involved.';
+    $('candidates').style.display = 'none';
+  }
+  await renderParamForm(it);
+}
+
+async function renderParamForm(it){
+  const form = $('paramForm');
+  form.innerHTML = '';
+  const params = it.params.filter(p => p.name !== 'projectId');
+  if (it.params.some(p => p.name === 'projectId')) {
+    const note = document.createElement('div');
+    note.className = 'phelp';
+    note.innerHTML = 'projectId = <b style="font-family:var(--font-mono);">' + esc(project() || '(select a project)') + '</b> — from the Scope selector.';
+    form.appendChild(note);
+  }
+  if (!params.length && !it.params.length) {
+    form.innerHTML = '<div class="phelp">No parameters — runs as-is.</div>';
+    return;
+  }
+  for (const p of params) {
+    const row = document.createElement('div');
+    row.className = 'prow';
+    const lbl = document.createElement('div');
+    lbl.className = 'plbl';
+    lbl.innerHTML = esc(p.name) + ' <span style="color:var(--ink-faint);">· ' + esc(p.type) + '</span>' + (p.required ? ' <span class="req">required</span>' : '');
+    row.appendChild(lbl);
+
+    let input;
+    if (p.options_kind && project()) {
+      input = document.createElement('select');
+      input.className = 'sel-in';
+      input.innerHTML = '<option value="">— select —</option>';
+      try {
+        const opts = await loadOptions(project(), p.options_kind);
+        opts.forEach(o => {
+          const el = document.createElement('option');
+          el.value = o.id;
+          el.textContent = (p.options_kind === '*' ? o.kind + ' · ' : '') + o.name + '  [' + o.id + ']';
+          input.appendChild(el);
+        });
+      } catch (err) { /* fall through with empty select */ }
+    } else {
+      input = document.createElement('input');
+      input.className = 'txt-in';
+      input.placeholder = p.required ? 'required' : 'optional';
+    }
+    input.dataset.param = p.name;
+    row.appendChild(input);
+
+    const help = document.createElement('div');
+    help.className = 'phelp';
+    help.textContent = p.description;
+    row.appendChild(help);
+    form.appendChild(row);
+  }
+}
+
+async function loadOptions(pid, kind){
+  const key = pid + '|' + kind;
+  if (!optionsCache[key]) {
+    const res = await api('/api/projects/' + encodeURIComponent(pid) + '/options?kind=' + encodeURIComponent(kind));
+    optionsCache[key] = res.rows;
+  }
+  return optionsCache[key];
+}
+
+// ---------------- execute ----------------
+async function runIntent(){
+  if (!selected) return;
+  clearError();
+  const params = {};
+  if (selected.params.some(p => p.name === 'projectId')) {
+    if (!project()) { showError('Select a project graph first.'); return; }
+    params.projectId = project();
+  }
+  document.querySelectorAll('#paramForm [data-param]').forEach(el => {
+    if (el.value.trim() !== '') params[el.dataset.param] = el.value.trim();
+  });
+
+  setPill('evStatus', 'accent', 'executing · ' + selected.intent);
+  try {
+    const res = await api('/api/execute', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({intent: selected.intent, params})
+    });
+    renderEvidence(res);
+  } catch (err) {
+    setPill('evStatus', 'err', 'failed');
+    showError(err.message);
+  }
+}
+
+// ---------------- evidence rendering ----------------
+function fmtCell(v){
+  if (v === null || v === undefined || v === '') return '<span class="null">—</span>';
+  if (Array.isArray(v)) return esc(v.join(', '));
+  if (typeof v === 'object') return esc(JSON.stringify(v));
+  const s = String(v);
+  if (/^(VERIFIED|IMPLEMENTED|PLANNED|UNKNOWN)$/.test(s)) return '<span class="st ' + s + '">' + s + '</span>';
+  return esc(s);
+}
+
+function renderEvidence(res){
+  $('evEmpty').style.display = 'none';
+  $('evContent').style.display = 'block';
+
+  const cols = res.columns;
+  let html = '<table class="rtable"><thead><tr>' + cols.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr></thead><tbody>';
+  if (!res.rows.length) {
+    html += '<tr><td colspan="' + cols.length + '"><span class="null">no rows</span></td></tr>';
+  } else {
+    res.rows.forEach(r => {
+      html += '<tr>' + cols.map(c => '<td>' + fmtCell(r[c]) + '</td>').join('') + '</tr>';
+    });
+  }
+  html += '</tbody></table>';
+  $('resultsWrap').innerHTML = html;
+  $('rowCount').innerHTML = '<b>' + res.row_count + '</b> row' + (res.row_count === 1 ? '' : 's');
+
+  $('cypherBlock').textContent = res.cypher;
+  $('cypherIntent').innerHTML = '<b>' + esc(res.lineage.produced_by) + '</b>';
+  $('paramsBlock').textContent = JSON.stringify(res.params, null, 2);
+
+  const lin = res.lineage;
+  $('linReq').textContent = lin.request_id;
+  $('linBy').textContent = lin.produced_by;
+  $('linSrc').textContent = lin.source;
+  $('linVer').textContent = lin.graph_version || '—';
+  $('linMs').textContent = lin.timing_ms + ' ms';
+  $('linAtt').textContent = lin.attempts;
+  stampTopMeta(lin);
+  setPill('evStatus', 'read', res.row_count + ' rows · ' + lin.timing_ms + ' ms');
+}
+
+function stampTopMeta(lin){
+  $('metaReq').textContent = lin.request_id || '—';
+  $('metaVer').textContent = lin.graph_version || '—';
+}
+
+// auto-connect on load (graceful failure shows the red pill + hint)
+connect();
+</script>
+</body>
+</html>

@@ -15,6 +15,11 @@ screenshots/
 # Build deps (the built bundle in assets/ is committed; node_modules is not)
 node_modules/
 
+# Backend local env + venv (never commit credentials)
+backend/.env
+backend/.venv/
+__pycache__/
+
 # Reference/iteration screenshots — not deliverables
 design-reference/**/*.png
 
